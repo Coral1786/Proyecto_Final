@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>INGEARQ | Detalle de ventas</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="estilos_interno.css" />
+  </head>
+  <body class="dashboard-body">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <div class="brand-box">
+            <div class="brand-circle">I</div>
+            <div>
+              <h1>INGEARQ</h1>
+              <p>Arte y arquitectura</p>
+            </div>
+          </div>
+
+          <nav class="menu">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="product_manager.html">Inventario</a>
+            <a href="sale_register.html">Ventas</a>
+            <a class="active" href="sales_details.html">Comprobantes</a>
+            <a href="cash_details.html">Caja</a>
+            <a class="admin-only" href="user_manager.html">Usuarios</a>
+          </nav>
+        </div>
+
+        <button id="logoutBtn" class="logout-btn" type="button">Cerrar sesión</button>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Historial comercial</p>
+            <h2>Comprobantes de venta</h2>
+          </div>
+          <div class="topbar-actions">
+            <span id="userRole" class="user-pill">Administrador</span>
+            <a class="primary-btn inline-link" href="sale_register.html">+ Nueva venta</a>
+          </div>
+        </header>
+
+        <section id="receipt" class="receipt hidden" aria-live="polite"></section>
+
+        <section class="stats-grid sales-mini-grid">
+          <article class="stat-card primary">
+            <span>Ventas del mes</span>
+            <strong id="monthSales">0</strong>
+            <small>Comprobantes emitidos</small>
+          </article>
+          <article class="stat-card">
+            <span>Ingresos totales</span>
+            <strong id="totalIncome">S/. 0.00</strong>
+            <small>Según ventas registradas</small>
+          </article>
+          <article class="stat-card accent">
+            <span>Boletas</span>
+            <strong id="boletaCount">0</strong>
+            <small>Documentos con DNI</small>
+          </article>
+          <article class="stat-card">
+            <span>Facturas</span>
+            <strong id="facturaCount">0</strong>
+            <small>Documentos con RUC</small>
+          </article>
+        </section>
+
+        <section class="panel-card">
+          <div class="card-header compact">
+            <h3>Ventas recientes</h3>
+            <span id="salesMeta">0 registros</span>
+          </div>
+
+          <div class="table-shell">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Tipo</th>
+                  <th>Cliente</th>
+                  <th>Fecha</th>
+                  <th>Total</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="salesTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="saleEditModal" class="product-modal hidden" role="dialog" aria-modal="true" aria-labelledby="saleEditTitle">
+      <form id="saleEditForm" class="product-modal-card">
+        <div class="card-header compact">
+          <h3 id="saleEditTitle">Editar comprobante</h3>
+          <button id="closeSaleEdit" class="ghost-btn" type="button" aria-label="Cerrar">Cerrar</button>
+        </div>
+        <div class="form-grid">
+          <div class="field-group"><label for="editSaleCustomer">Cliente</label><input id="editSaleCustomer" maxlength="200" required /></div>
+          <div class="field-group"><label for="editSaleDocument">DNI / RUC</label><input id="editSaleDocument" maxlength="30" /></div>
+          <div class="field-group"><label for="editSaleType">Comprobante</label><select id="editSaleType"><option>Boleta</option><option>Factura</option></select></div>
+          <div class="field-group"><label for="editSalePayment">Forma de pago</label><select id="editSalePayment"></select></div>
+        </div>
+        <div class="submit-row"><button class="primary-btn" type="submit">Guardar cambios</button></div>
+      </form>
+    </div>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script src="api-client.js"></script>
+    <script>
+      const isLoggedIn = localStorage.getItem("ingearqLoggedIn") === "true";
+      if (!isLoggedIn) {
+        window.location.href = "index.html";
+      }
+      requireServerSession();
+
+      const role = localStorage.getItem("ingearqRole") || "admin";
+      const isSeller = role !== "admin";
+      const userRole = document.getElementById("userRole");
+      if (userRole) {
+        userRole.textContent = isSeller ? "Cliente" : "Administrador";
+      }
+      loadSelectOptions(document.getElementById("editSalePayment"), "/api/catalogos/formas-pago")
+        .catch((error) => alert(error.message));
+
+      function formatMoney(value) {
+        return `S/. ${Number(value).toFixed(2)}`;
+      }
+
+      function safeNumber(value) {
+        const numericValue = Number(value);
+        return Number.isFinite(numericValue) ? numericValue : 0;
+      }
+
+      const receipt = document.getElementById("receipt");
+
+      function renderReceipt(sale) {
+        receipt.classList.remove("hidden");
+
+        const subtotal = sale.items.reduce((sum, item) => sum + safeNumber(item.subtotal), 0);
+        const igv = subtotal * 0.18;
+        const itemsHtml = sale.items
+          .map(
+            (item) => `
+              <tr>
+                <td>${escapeHtml(item.name)}</td>
+                <td class="qty">${item.quantity}</td>
+                <td class="total">${formatMoney(item.subtotal)}</td>
+              </tr>
+            `
+          )
+          .join("");
+
+        receipt.innerHTML = `
+          <div class="receipt-header">
+            <h3>INGEARQ</h3>
+            <p>Arte y arquitectura</p>
+          </div>
+
+          <div class="receipt-meta">
+            <div class="receipt-meta-row"><span>${escapeHtml(sale.type)}</span><strong>${escapeHtml(sale.code)}</strong></div>
+            <div class="receipt-meta-row"><span>Cliente</span><strong>${escapeHtml(sale.customer)}</strong></div>
+            <div class="receipt-meta-row"><span>Doc.</span><strong>${escapeHtml(sale.documentNumber)}</strong></div>
+            <div class="receipt-meta-row"><span>Fecha</span><strong>${escapeHtml(sale.date)}</strong></div>
+          </div>
+
+          <table class="receipt-items">
+            <thead>
+              <tr>
+                <th>Prod.</th>
+                <th class="qty">Cant.</th>
+                <th class="total">Monto</th>
+              </tr>
+            </thead>
+            <tbody>${itemsHtml}</tbody>
+          </table>
+
+          <div class="receipt-total">
+            <div class="receipt-total-row"><span>Subtotal</span><strong>${formatMoney(subtotal)}</strong></div>
+            <div class="receipt-total-row"><span>IGV</span><strong>${formatMoney(igv)}</strong></div>
+            <div class="receipt-total-row"><span>Total</span><strong>${formatMoney(sale.total)}</strong></div>
+          </div>
+
+          <div class="receipt-footer">
+            <div>Pago: ${escapeHtml(sale.paymentMethod)}</div>
+            <div>Gracias por su compra</div>
+          </div>
+        `;
+      }
+
+      let sales = [];
+      const tbody = document.getElementById("salesTableBody");
+      const saleEditModal = document.getElementById("saleEditModal");
+      const saleEditForm = document.getElementById("saleEditForm");
+      let editingSale = null;
+
+      function renderSales() {
+        tbody.innerHTML = "";
+
+        sales.forEach((sale) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${escapeHtml(sale.code)}</td>
+            <td>${escapeHtml(sale.type)}</td>
+            <td>${escapeHtml(sale.customer)}</td>
+            <td>${escapeHtml(sale.date)}</td>
+            <td>${formatMoney(sale.total)}</td>
+            <td><span class="status-badge ${sale.status === "Anulado" ? "danger" : "success"}">${escapeHtml(sale.status)}</span></td>
+            <td class="row-actions">
+              <button class="ghost-btn small-btn" type="button" data-action="detail" data-id="${sale.id}">Ver</button>
+              <button class="secondary-btn small-btn" type="button" data-action="print" data-id="${sale.id}">Reimprimir</button>
+              <button class="ghost-btn small-btn ${isSeller || sale.status === "Anulado" ? "hidden" : ""}" type="button" data-action="edit" data-id="${sale.id}">Editar</button>
+              <button class="danger-btn small-btn ${isSeller ? "hidden" : ""}" type="button" data-action="cancel" data-id="${sale.id}">Anular</button>
+            </td>
+          `;
+
+          tbody.appendChild(row);
+        });
+
+        document.getElementById("monthSales").textContent = sales.length;
+        const issuedSales = sales.filter((sale) => sale.status !== "Anulado");
+        document.getElementById("totalIncome").textContent = formatMoney(issuedSales.reduce((sum, sale) => sum + Number(sale.total || 0), 0));
+        document.getElementById("boletaCount").textContent = issuedSales.filter((sale) => sale.type === "Boleta").length;
+        document.getElementById("facturaCount").textContent = issuedSales.filter((sale) => sale.type === "Factura").length;
+        document.getElementById("salesMeta").textContent = `${sales.length} registros`;
+      }
+
+      tbody.addEventListener("click", async (event) => {
+        const button = event.target.closest("button");
+        if (!button) return;
+
+        const saleId = button.dataset.id;
+        const sale = sales.find((item) => item.id === saleId);
+        if (!sale) return;
+
+        if (button.dataset.action === "detail") {
+          const details = sale.items.map((item) => `${item.name} x${item.quantity}`).join("; ");
+          alert(`${sale.code} - ${sale.type}\nCliente: ${sale.customer}\nDocumento: ${sale.documentNumber}\nDetalle: ${details}\nTotal: ${formatMoney(sale.total)}`);
+        }
+
+        if (button.dataset.action === "print") {
+          renderReceipt(sale);
+          setTimeout(() => {
+            window.print();
+          }, 100);
+        }
+
+        if (button.dataset.action === "edit" && !isSeller && sale.status !== "Anulado") {
+          editingSale = sale;
+          document.getElementById("editSaleCustomer").value = sale.customer;
+          document.getElementById("editSaleDocument").value = sale.documentNumber;
+          document.getElementById("editSaleType").value = sale.type;
+          document.getElementById("editSalePayment").value = sale.paymentMethod;
+          saleEditModal.classList.remove("hidden");
+          document.getElementById("editSaleCustomer").focus();
+        }
+
+        if (button.dataset.action === "cancel" && !isSeller) {
+          try {
+            if (!window.confirm(`¿Deseas anular el comprobante ${sale.code}?`)) return;
+            await apiRequest(`/api/ventas/${sale.id}`, { method: "DELETE" });
+            await loadSales();
+          } catch (error) {
+            alert(error.message);
+          }
+        }
+      });
+
+      document.getElementById("closeSaleEdit").addEventListener("click", () => {
+        saleEditModal.classList.add("hidden");
+        editingSale = null;
+      });
+      saleEditModal.addEventListener("click", (event) => {
+        if (event.target === saleEditModal) {
+          saleEditModal.classList.add("hidden");
+          editingSale = null;
+        }
+      });
+      saleEditForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!editingSale) return;
+        try {
+          await apiRequest(`/api/ventas/${editingSale.id}`, {
+            method: "PUT",
+            body: {
+              customer: document.getElementById("editSaleCustomer").value.trim(),
+              documentNumber: document.getElementById("editSaleDocument").value.trim(),
+              type: document.getElementById("editSaleType").value,
+              paymentMethod: document.getElementById("editSalePayment").value
+            }
+          });
+          saleEditModal.classList.add("hidden");
+          editingSale = null;
+          await loadSales();
+        } catch (error) {
+          alert(error.message);
+        }
+      });
+
+      async function loadSales() {
+        sales = await apiRequest("/api/ventas");
+        renderSales();
+      }
+
+      loadSales().catch((error) => alert(error.message));
+
+      document.getElementById("logoutBtn").addEventListener("click", async function () {
+        await apiRequest("/api/auth/logout", { method: "POST" }).catch(() => {});
+        localStorage.removeItem("ingearqLoggedIn");
+        localStorage.removeItem("ingearqRole");
+        window.location.href = "index.html";
+      });
+    </script>
+  </body>
+</html>

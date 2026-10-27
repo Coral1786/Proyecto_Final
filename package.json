@@ -1,0 +1,23 @@
+{
+  "name": "ingearq-local",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplicacion local de inventario y ventas INGEARQ",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test:e2e:prepare": "node e2e/prepare-database.js",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "mysql2": "^3.12.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}

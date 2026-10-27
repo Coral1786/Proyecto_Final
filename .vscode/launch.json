@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-IngearqApplication<ingearq-local>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "pe.ingearq.IngearqApplication",
+            "projectName": "ingearq-local",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}

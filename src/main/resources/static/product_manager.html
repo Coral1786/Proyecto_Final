@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>INGEARQ | Inventario</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="estilos_interno.css" />
+  </head>
+  <body class="dashboard-body">
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div>
+          <div class="brand-box">
+            <div class="brand-circle">I</div>
+            <div>
+              <h1>INGEARQ</h1>
+              <p>Arte y arquitectura</p>
+            </div>
+          </div>
+
+          <nav class="menu">
+            <a href="dashboard.html">Dashboard</a>
+            <a class="active" href="product_manager.html">Inventario</a>
+            <a href="sale_register.html">Ventas</a>
+            <a href="sales_details.html">Comprobantes</a>
+            <a href="cash_details.html">Caja</a>
+            <a class="admin-only" href="user_manager.html">Usuarios</a>
+          </nav>
+        </div>
+
+        <button id="logoutBtn" class="logout-btn" type="button">Cerrar sesión</button>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Control operativo</p>
+            <h2>Gestión de inventario</h2>
+          </div>
+          <div class="topbar-actions">
+            <span id="userRole" class="user-pill">Administrador</span>
+            <button id="newProductBtn" class="primary-btn" type="button" data-role-only="admin">+ Nuevo producto</button>
+          </div>
+        </header>
+
+        <div id="readOnlyNotice" class="read-only-banner hidden">
+          Modo de solo lectura para cliente: no puedes editar ni registrar stock.
+        </div>
+
+        <section class="panel-card product-layout">
+          <div class="card-header compact">
+            <h3>Productos principales</h3>
+            <div class="toolbar-inline">
+              <input id="productSearch" type="search" placeholder="Buscar producto" aria-label="Buscar producto" />
+              <button class="secondary-btn" type="button" data-role-only="admin">Exportar</button>
+            </div>
+          </div>
+
+          <div class="table-shell">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Categoría</th>
+                  <th>Stock</th>
+                  <th>Precio</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="productTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="productModal" class="product-modal hidden" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
+      <form id="productForm" class="product-modal-card">
+        <div class="card-header compact">
+          <h3 id="productModalTitle">Nuevo producto</h3>
+          <button id="closeProductModal" class="ghost-btn" type="button" aria-label="Cerrar">Cerrar</button>
+        </div>
+        <div class="form-grid">
+          <div class="field-group"><label for="productName">Nombre</label><input id="productName" required /></div>
+          <div class="field-group"><label for="productCategory">Categoría</label><select id="productCategory" required></select></div>
+          <div class="field-group"><label for="productDescription">Descripción breve</label><input id="productDescription" maxlength="500" /></div>
+          <div class="field-group"><label for="productStock">Stock</label><input id="productStock" type="number" min="0" step="1" required /></div>
+          <div class="field-group"><label for="productPrice">Precio</label><input id="productPrice" type="number" min="0" step="0.01" required /></div>
+        </div>
+        <div class="submit-row"><button class="primary-btn" type="submit">Guardar producto</button></div>
+      </form>
+    </div>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script src="api-client.js"></script>
+    <script>
+      const isLoggedIn = localStorage.getItem("ingearqLoggedIn") === "true";
+      if (!isLoggedIn) {
+        window.location.href = "index.html";
+      }
+        requireServerSession();
+
+      const role = localStorage.getItem("ingearqRole") || "admin";
+      const isSeller = role !== "admin";
+      const productTableBody = document.getElementById("productTableBody");
+      const productSearch = document.getElementById("productSearch");
+      let products = [];
+
+      function getStatus(product) {
+        if (!product.active) return { label: "Dado de baja", className: "danger" };
+        if (product.stock === 0) return { label: "Sin stock", className: "danger" };
+        if (product.stock < 30) return { label: "Poco stock", className: "warning" };
+        return { label: "Disponible", className: "success" };
+      }
+
+      function renderProducts() {
+        const searchTerm = productSearch.value.trim().toLowerCase();
+        const visibleProducts = products.filter((product) => {
+          return `${product.name} ${product.category} ${product.id}`.toLowerCase().includes(searchTerm);
+        });
+
+        productTableBody.innerHTML = visibleProducts.map((product) => {
+          const status = getStatus(product);
+          const actionLabel = product.active ? "Dar de baja" : "Reactivar";
+          return `<tr>
+            <td><div class="product-name"><span class="product-thumb ${product.color}">${escapeHtml(product.name.charAt(0).toUpperCase())}</span><div><strong>${escapeHtml(product.name)}</strong><small>SKU: ${product.id}</small></div></div></td>
+            <td>${escapeHtml(product.category)}</td>
+            <td>${product.stock}</td>
+            <td>S/. ${product.price.toFixed(2)}</td>
+            <td><span class="status-badge ${status.className}">${status.label}</span></td>
+            <td class="row-actions ${isSeller ? "hidden" : ""}" data-role-only="admin">
+              <button class="ghost-btn edit-product" type="button" data-id="${product.id}">Editar</button>
+              <button class="danger-btn toggle-product" type="button" data-id="${product.id}">${actionLabel}</button>
+            </td>
+            <td class="row-actions read-only-cell ${isSeller ? "" : "hidden"}" data-role-only="client"><span class="muted-text">Vista</span></td>
+          </tr>`;
+        }).join("");
+      }
+
+      const productModal = document.getElementById("productModal");
+      const productForm = document.getElementById("productForm");
+      let editingProduct = null;
+
+      function openProductForm(product) {
+        editingProduct = product || null;
+        document.getElementById("productModalTitle").textContent = product ? "Editar producto" : "Nuevo producto";
+        document.getElementById("productName").value = product?.name || "";
+        document.getElementById("productCategory").value = product?.category || "";
+        document.getElementById("productDescription").value = product?.description || "";
+        document.getElementById("productStock").value = product?.stock ?? 0;
+        document.getElementById("productPrice").value = product?.price ?? 0;
+        productModal.classList.remove("hidden");
+        document.getElementById("productName").focus();
+      }
+
+      function closeProductForm() {
+        productModal.classList.add("hidden");
+        editingProduct = null;
+      }
+
+      document.getElementById("newProductBtn").addEventListener("click", function () {
+        openProductForm();
+      });
+
+      productForm.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        const productData = {
+          name: document.getElementById("productName").value.trim(),
+          category: document.getElementById("productCategory").value.trim(),
+          description: document.getElementById("productDescription").value.trim(),
+          stock: Number(document.getElementById("productStock").value),
+          price: Number(document.getElementById("productPrice").value)
+        };
+        if (!productData.name || !productData.category || productData.stock < 0 || productData.price < 0) return;
+        try {
+          if (editingProduct) {
+            await apiRequest(`/api/productos/${editingProduct.id}`, {
+              method: "PUT",
+              body: { ...productData, active: editingProduct.active }
+            });
+          } else {
+            await apiRequest("/api/productos", { method: "POST", body: productData });
+          }
+          await refreshProducts();
+          closeProductForm();
+        } catch (error) {
+          alert(error.message);
+        }
+      });
+
+      document.getElementById("closeProductModal").addEventListener("click", closeProductForm);
+      productModal.addEventListener("click", function (event) {
+        if (event.target === productModal) closeProductForm();
+      });
+
+      productTableBody.addEventListener("click", async function (event) {
+        const button = event.target.closest("button");
+        if (!button || isSeller) return;
+        const product = products.find((item) => item.id === Number(button.dataset.id));
+        if (!product) return;
+
+        if (button.classList.contains("edit-product")) {
+          openProductForm(product);
+          return;
+        } else if (button.classList.contains("toggle-product")) {
+          const action = product.active ? "dar de baja" : "reactivar";
+          if (!window.confirm(`¿Deseas ${action} \"${product.name}\"?`)) return;
+          try {
+            if (product.active) {
+              await apiRequest(`/api/productos/${product.id}`, { method: "DELETE" });
+            } else {
+              await apiRequest(`/api/productos/${product.id}`, {
+                method: "PUT",
+                body: { ...product, active: true }
+              });
+            }
+            await refreshProducts();
+          } catch (error) {
+            alert(error.message);
+          }
+        }
+      });
+
+      productSearch.addEventListener("input", renderProducts);
+      async function refreshProducts() {
+        products = await apiRequest("/api/productos");
+        renderProducts();
+      }
+
+      refreshProducts().catch((error) => alert(error.message));
+      loadSelectOptions(document.getElementById("productCategory"), "/api/catalogos/categorias")
+        .catch((error) => alert(error.message));
+      const userRole = document.getElementById("userRole");
+      if (userRole) {
+        userRole.textContent = isSeller ? "Cliente" : "Administrador";
+      }
+
+      document.querySelectorAll("[data-role-only='admin']").forEach((element) => {
+        if (isSeller) {
+          element.classList.add("hidden");
+        }
+      });
+
+      document.querySelectorAll("[data-role-only='client']").forEach((element) => {
+        if (!isSeller) {
+          element.classList.add("hidden");
+        }
+      });
+
+      if (isSeller) {
+        const notice = document.getElementById("readOnlyNotice");
+        if (notice) notice.classList.remove("hidden");
+      }
+
+      document.getElementById("logoutBtn").addEventListener("click", async function () {
+          localStorage.removeItem("ingearqLoggedIn");
+          localStorage.removeItem("ingearqRole");
+          await apiRequest("/api/auth/logout", { method: "POST" }).catch(() => {});
+          window.location.href = "index.html";
+      });
+    </script>
+  </body>
+</html>
