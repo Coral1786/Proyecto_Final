@@ -91,7 +91,7 @@
           <div class="field-group"><label for="userPassword">Clave</label><input id="userPassword" type="password" maxlength="72" autocomplete="new-password" /></div>
           <div class="field-group">
             <label for="userProfile">Perfil</label>
-            <select id="userProfile"><option value="cliente">Cliente</option><option value="administrador">Administrador</option></select>
+            <select id="userProfile"><option value="vendedor">Vendedor</option><option value="administrador">Administrador</option></select>
           </div>
           <div class="field-group">
             <label for="userStatus">Estado</label>
@@ -133,7 +133,7 @@
             <td>${escapeHtml(user.dni)}</td>
             <td>${escapeHtml(user.names)} ${escapeHtml(user.surnames)}</td>
             <td>${escapeHtml(user.username)}</td>
-            <td>${user.profile === "administrador" ? "Administrador" : "Cliente"}</td>
+            <td>${user.profile === "administrador" ? "Administrador" : "Vendedor"}</td>
             <td><span class="status-badge ${active ? "success" : "danger"}">${active ? "Activo" : "Dado de baja"}</span></td>
             <td class="row-actions">
               <button class="ghost-btn edit-user" type="button" data-id="${user.id}">Editar</button>
@@ -157,7 +157,7 @@
         document.getElementById("userUsername").value = user?.username || "";
         document.getElementById("userPassword").value = "";
         document.getElementById("userPassword").placeholder = user ? "Dejar vacío para conservar" : "Mínimo 8 caracteres";
-        document.getElementById("userProfile").value = user?.profile || "cliente";
+        document.getElementById("userProfile").value = user?.profile || "vendedor";
         document.getElementById("userStatus").value = user?.status || "activo";
         userFormError.classList.add("hidden");
         userModal.classList.remove("hidden");

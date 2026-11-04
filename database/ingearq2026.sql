@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   apellidos VARCHAR(100) NOT NULL,
   usuario VARCHAR(50) NOT NULL,
   clave_hash VARCHAR(255) NOT NULL,
-  perfil ENUM('cliente', 'administrador') NOT NULL DEFAULT 'cliente',
+  perfil ENUM('vendedor', 'administrador') NOT NULL DEFAULT 'vendedor',
   estado ENUM('activo', 'inactivo') NOT NULL DEFAULT 'activo',
   PRIMARY KEY (id_usuario),
   UNIQUE KEY uq_usuarios_dni (dni),

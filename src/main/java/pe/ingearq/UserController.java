@@ -28,7 +28,7 @@ import jakarta.servlet.http.HttpSession;
 public class UserController {
     private static final Pattern DNI = Pattern.compile("\\d{8}");
     private static final Pattern USERNAME = Pattern.compile("[a-z0-9_.]{4,50}");
-    private static final Set<String> PROFILES = Set.of("cliente", "administrador");
+    private static final Set<String> PROFILES = Set.of("vendedor", "administrador");
     private static final Set<String> STATUSES = Set.of("activo", "inactivo");
 
     private final JdbcTemplate jdbc;

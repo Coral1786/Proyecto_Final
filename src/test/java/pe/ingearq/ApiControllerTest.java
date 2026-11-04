@@ -87,7 +87,7 @@ class ApiControllerTest {
         void rejectsLoginForInactiveUser() {
         Map<String, Object> account = Map.of(
             "id_usuario", 8L, "nombres", "Bob", "apellidos", "X", "usuario", "bob",
-            "clave_hash", "h", "perfil", "cliente", "estado", "inactivo");
+            "clave_hash", "h", "perfil", "vendedor", "estado", "inactivo");
         when(jdbc.queryForList(anyString(), eq("bob"))).thenReturn(java.util.List.of(account));
         when(passwordEncoder.matches("secret", "h")).thenReturn(true);
 

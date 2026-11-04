@@ -133,7 +133,7 @@
       const isSeller = role !== "admin";
       const userRole = document.getElementById("userRole");
       if (userRole) {
-        userRole.textContent = isSeller ? "Cliente" : "Administrador";
+        userRole.textContent = isSeller ? "Vendedor" : "Administrador";
       }
       loadSelectOptions(document.getElementById("editSalePayment"), "/api/catalogos/formas-pago")
         .catch((error) => alert(error.message));

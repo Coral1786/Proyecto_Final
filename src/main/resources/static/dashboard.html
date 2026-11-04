@@ -177,7 +177,7 @@
       requireServerSession().then((result) => {
         if (!result) return;
         const userRole = document.getElementById("userRole");
-        if (userRole) userRole.textContent = result.user.role === "admin" ? "Administrador" : "Cliente";
+        if (userRole) userRole.textContent = result.user.role === "admin" ? "Administrador" : "Vendedor";
         loadDashboard().catch((error) => {
           const dashboardError = document.getElementById("dashboardError");
           dashboardError.textContent = error.message;

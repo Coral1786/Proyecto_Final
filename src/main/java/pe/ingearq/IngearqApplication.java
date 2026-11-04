@@ -47,11 +47,12 @@ public class IngearqApplication {
                     + "apellidos VARCHAR(100) NOT NULL, "
                     + "usuario VARCHAR(50) NOT NULL, "
                     + "clave_hash VARCHAR(255) NOT NULL, "
-                    + "perfil ENUM('cliente', 'administrador') NOT NULL DEFAULT 'cliente', "
+                    + "perfil                     ENUM('vendedor', 'administrador') NOT NULL DEFAULT 'vendedor', "
                     + "estado ENUM('activo', 'inactivo') NOT NULL DEFAULT 'activo', "
                     + "PRIMARY KEY (id_usuario), "
                     + "UNIQUE KEY uq_usuarios_dni (dni), "
                     + "UNIQUE KEY uq_usuarios_usuario (usuario)) ENGINE=InnoDB");
+                                migrateProfileClienteToVendedor(jdbc);
             jdbc.execute("CREATE TABLE IF NOT EXISTS categorias ("
                     + "id_categoria INT UNSIGNED NOT NULL AUTO_INCREMENT, "
                     + "nombre VARCHAR(100) NOT NULL, "
@@ -80,9 +81,22 @@ public class IngearqApplication {
             jdbc.update("UPDATE usuarios SET usuario = ?, nombres = 'Vendedor' "
                     + "WHERE dni = '00000002' AND usuario = 'cliente' "
                     + "AND NOT EXISTS (SELECT 1 FROM (SELECT 1 FROM usuarios WHERE usuario = ?) u)", clientUser, clientUser);
-            seedUser(jdbc, passwordEncoder, "00000002", "Vendedor", "Demo", clientUser, clientPassword, "cliente");
+            seedUser(jdbc, passwordEncoder, "00000002", "Vendedor", "Demo", clientUser, clientPassword, "vendedor");
             seedProducts(jdbc);
         };
+    }
+
+    private void migrateProfileClienteToVendedor(JdbcTemplate jdbc) {
+        String type = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'perfil'",
+                String.class);
+        if (type == null || !type.contains("'cliente'")) return;
+        jdbc.execute("ALTER TABLE usuarios MODIFY perfil "
+                + "ENUM('cliente', 'vendedor', 'administrador') NOT NULL DEFAULT 'cliente'");
+        jdbc.update("UPDATE usuarios SET perfil = 'vendedor' WHERE perfil = 'cliente'");
+        jdbc.execute("ALTER TABLE usuarios MODIFY perfil "
+                + "ENUM('vendedor', 'administrador') NOT NULL DEFAULT 'vendedor'");
     }
 
     private void addColumnIfMissing(JdbcTemplate jdbc, String table, String column, String definition) {
