@@ -652,6 +652,23 @@ body {
   color: var(--text);
 }
 
+.cash-settlement {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 16px;
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.cash-settlement .summary-line {
+  margin: 0;
+  padding: 0 0 10px;
+}
+
 .total-row {
   font-size: 1.1rem;
   color: var(--text);
@@ -681,7 +698,27 @@ body {
 }
 
 .receipt {
-  display: none;
+  display: block;
+  width: min(100%, 620px);
+  margin: 0 auto;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.receipt-panel:not(.hidden) {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.receipt-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
 }
 
 .sales-mini-grid {
@@ -701,8 +738,13 @@ body {
   .main-panel > .stats-grid,
   .main-panel > .panel-card,
   .main-panel > .card-header,
-  .main-panel > section:not(.receipt) {
+  .main-panel > section:not(.receipt):not(.receipt-panel),
+  .receipt-actions {
     display: none !important;
+  }
+
+  .receipt-panel:not(.hidden) {
+    display: block !important;
   }
 
   .app-shell {
@@ -719,6 +761,8 @@ body {
     width: 78mm;
     margin: 0 auto;
     padding: 10px 8px;
+    border: 0;
+    border-radius: 0;
     font-family: "Consolas", "Courier New", monospace;
     font-size: 11px;
     line-height: 1.45;
@@ -867,6 +911,10 @@ body {
   }
 
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cash-settlement {
     grid-template-columns: 1fr;
   }
 

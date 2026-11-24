@@ -7,7 +7,8 @@ test('administra un producto: alta, edición, baja y reactivación', async ({ pa
 
   const productName = `E2E Producto ${Date.now()}`;
   let productRow = await createProduct(page, productName);
-  await expect(productRow).toContainText('Pruebas E2E');
+  await expect(productRow).toContainText('Materiales');
+  await expect(productRow).toContainText('S/. 10.00');
   await expect(productRow).toContainText('5');
 
   await productRow.getByRole('button', { name: 'Editar' }).click();

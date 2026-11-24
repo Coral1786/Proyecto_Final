@@ -2,7 +2,7 @@ CREATE DATABASE IF NOT EXISTS `ingearq2026`
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 
-USE `ingearq2026`;
+USE  `ingearq2026`;
 
 CREATE TABLE IF NOT EXISTS trabajadores (
   id_trabajador INT UNSIGNED NOT NULL AUTO_INCREMENT,

@@ -3,6 +3,12 @@ const { createProduct, loginAsAdmin } = require('./helpers');
 
 test('vende, edita y anula un comprobante; verifica stock y caja', async ({ page }) => {
   page.on('dialog', (dialog) => dialog.accept());
+  await page.addInitScript(() => {
+    window.__printCalls = 0;
+    window.print = () => {
+      window.__printCalls += 1;
+    };
+  });
   await loginAsAdmin(page);
 
   await page.goto('/cash_details.html');
@@ -19,13 +25,32 @@ test('vende, edita y anula un comprobante; verifica stock y caja', async ({ page
   await productResult.click();
   await page.locator('#saleItemsBody .qty-input').fill('2');
   await expect(page.locator('#totalValue')).toContainText('23.60');
+  const cashReceived = page.getByLabel('Monto recibido (efectivo)');
+  await cashReceived.fill('20');
+  await expect(cashReceived).toHaveJSProperty('validationMessage', 'El monto recibido debe cubrir el total de la venta.');
+  await cashReceived.fill('25');
+  await expect(page.locator('#cashChangeValue')).toHaveText('S/. 1.40');
 
   const saleResponse = page.waitForResponse((response) =>
     response.url().endsWith('/api/ventas') && response.request().method() === 'POST'
   );
-  await page.getByRole('button', { name: 'Guardar comprobante' }).click();
+  await page.getByRole('button', { name: 'Cobrar y guardar comprobante' }).click();
   const createdSale = await (await saleResponse).json();
   expect(createdSale.total).toBe(23.6);
+  expect(createdSale.amountReceived).toBe(25);
+  expect(createdSale.changeDue).toBe(1.4);
+  await expect(page.locator('#receipt')).toContainText('Recibido: S/. 25.00');
+  await expect(page.locator('#receipt')).toContainText('Vuelto: S/. 1.40');
+  await expect.poll(() => page.evaluate(() => window.__printCalls)).toBe(1);
+  await page.emulateMedia({ media: 'print' });
+  await expect(page.locator('#receipt')).toBeVisible();
+  const pdf = await page.pdf({ printBackground: true });
+  expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+  await page.emulateMedia({ media: 'screen' });
+  await page.getByRole('button', { name: 'Imprimir / Guardar PDF' }).click();
+  await expect.poll(() => page.evaluate(() => window.__printCalls)).toBe(2);
+  await page.getByRole('button', { name: 'Nueva venta' }).click();
+  await expect(page.locator('.sales-layout')).toBeVisible();
 
   await page.goto('/sales_details.html');
   let saleRow = page.locator('#salesTableBody tr').filter({ hasText: customer });
@@ -37,6 +62,13 @@ test('vende, edita y anula un comprobante; verifica stock y caja', async ({ page
   await page.getByRole('button', { name: 'Guardar cambios' }).click();
   saleRow = page.locator('#salesTableBody tr').filter({ hasText: updatedCustomer });
   await expect(saleRow).toContainText('Factura');
+  await saleRow.getByRole('button', { name: 'Reimprimir' }).click();
+  await expect(page.locator('#receipt')).toContainText('Factura');
+  await expect.poll(() => page.evaluate(() => window.__printCalls)).toBe(1);
+  await page.emulateMedia({ media: 'print' });
+  const invoicePdf = await page.pdf({ printBackground: true });
+  expect(invoicePdf.subarray(0, 4).toString()).toBe('%PDF');
+  await page.emulateMedia({ media: 'screen' });
 
   const cancelResponse = page.waitForResponse((response) =>
     response.url().endsWith(`/api/ventas/${createdSale.id}`) && response.request().method() === 'DELETE'

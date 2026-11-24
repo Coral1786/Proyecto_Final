@@ -25,7 +25,7 @@ Spring aplica al arrancar las migraciones aditivas (`productos.activo`, `caja.de
 ## CRUDs operativos
 
 - **Productos:** listar, crear, editar y dar de baja/reactivar desde Inventario. La baja es logica para conservar el historial de ventas. La categoria se elige de una lista cargada desde la tabla `categorias`.
-- **Ventas:** listar, crear, editar datos del comprobante y anular desde Comprobantes. La forma de pago se elige de una lista cargada desde la tabla `formas_pago`. La anulacion restaura el stock y registra el movimiento compensatorio de caja dentro de una transaccion.
+- **Ventas presenciales:** registrar, editar datos del comprobante y anular desde Comprobantes. La forma de pago se elige de `formas_pago`. Para efectivo se captura el monto recibido, se valida que cubra el total y se calcula el vuelto; los otros medios se registran por el total, sin integrar una pasarela externa. Al completar la venta se muestra la boleta o factura, con opciones para imprimir/guardar como PDF y comenzar una nueva venta. La anulacion restaura el stock y registra el movimiento compensatorio de caja dentro de una transaccion.
 
 ## Pruebas de navegador
 

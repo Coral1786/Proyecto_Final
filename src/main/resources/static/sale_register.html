@@ -46,7 +46,13 @@
           <div class="user-pill">Caja / ventas</div>
         </header>
 
-        <section id="receipt" class="receipt hidden" aria-live="polite"></section>
+        <section id="receiptPanel" class="receipt-panel hidden" aria-live="polite">
+          <div id="receipt" class="receipt"></div>
+          <div class="receipt-actions">
+            <button id="printReceiptBtn" class="primary-btn" type="button">Imprimir / Guardar PDF</button>
+            <button id="newSaleBtn" class="secondary-btn" type="button">Nueva venta</button>
+          </div>
+        </section>
 
         <section class="sales-layout">
           <article class="panel-card big-card">
@@ -114,8 +120,19 @@
                 </table>
               </div>
 
+              <section id="cashSettlement" class="cash-settlement hidden" aria-live="polite">
+                <div class="field-group">
+                  <label for="cashReceived">Monto recibido (efectivo)</label>
+                  <input id="cashReceived" type="number" min="0" step="0.01" value="0.00" required />
+                </div>
+                <div class="summary-line">
+                  <span>Vuelto</span>
+                  <strong id="cashChangeValue">S/. 0.00</strong>
+                </div>
+              </section>
+
               <div class="submit-row">
-                <button class="primary-btn" type="submit">Guardar comprobante</button>
+                <button class="primary-btn" type="submit">Cobrar y guardar comprobante</button>
               </div>
             </form>
           </article>
@@ -166,8 +183,6 @@
         window.location.href = "index.html";
       }
       requireServerSession();
-      loadSelectOptions(document.getElementById("paymentMethod"), "/api/catalogos/formas-pago")
-        .catch((error) => alert(error.message));
 
       const saleForm = document.getElementById("saleForm");
       const saleItemsBody = document.getElementById("saleItemsBody");
@@ -176,12 +191,28 @@
       const subtotalValue = document.getElementById("subtotalValue");
       const igvValue = document.getElementById("igvValue");
       const totalValue = document.getElementById("totalValue");
+      const paymentMethodSelect = document.getElementById("paymentMethod");
+      const cashSettlement = document.getElementById("cashSettlement");
+      const cashReceivedInput = document.getElementById("cashReceived");
+      const cashChangeValue = document.getElementById("cashChangeValue");
+      const receiptPanel = document.getElementById("receiptPanel");
       const receipt = document.getElementById("receipt");
+      const salesLayout = document.querySelector(".sales-layout");
       const docButtons = document.querySelectorAll(".document-option");
       const productSearch = document.getElementById("productSearch");
       const productResults = document.getElementById("productResults");
       let docForceList = [];
       let activeDoc = "boleta";
+      let cashReceivedTouched = false;
+
+      loadSelectOptions(paymentMethodSelect, "/api/catalogos/formas-pago")
+        .then(() => {
+          if ([...paymentMethodSelect.options].some((option) => option.value === "Efectivo")) {
+            paymentMethodSelect.value = "Efectivo";
+          }
+          calculateTotals();
+        })
+        .catch((error) => alert(error.message));
 
       function safeNumber(value) {
         const numericValue = Number(value);
@@ -307,10 +338,13 @@
       }
 
       function renderReceipt(sale) {
-        receipt.classList.remove("hidden");
+        receiptPanel.classList.remove("hidden");
 
         const subtotal = sale.items.reduce((sum, item) => sum + (safeNumber(item.subtotal) || 0), 0);
         const igv = subtotal * 0.18;
+        const cashDetails = String(sale.paymentMethod).toLowerCase() === "efectivo"
+          ? `<div>Recibido: ${formatMoney(sale.amountReceived)}</div><div>Vuelto: ${formatMoney(sale.changeDue)}</div>`
+          : "";
         const itemsHtml = sale.items
           .map(
             (item) => `
@@ -355,6 +389,7 @@
 
           <div class="receipt-footer">
             <div>Pago: ${escapeHtml(sale.paymentMethod)}</div>
+            ${cashDetails}
             <div>Gracias por su compra</div>
           </div>
         `;
@@ -370,12 +405,30 @@
           subtotal += qty * price;
         });
 
-        const igv = subtotal * 0.18;
-        const total = subtotal + igv;
+        subtotal = Math.round(subtotal * 100) / 100;
+        const igv = Math.round(subtotal * 0.18 * 100) / 100;
+        const total = Math.round((subtotal + igv) * 100) / 100;
 
         subtotalValue.textContent = formatMoney(subtotal);
         igvValue.textContent = formatMoney(igv);
         totalValue.textContent = formatMoney(total);
+
+        const isCash = paymentMethodSelect.value.trim().toLowerCase() === "efectivo";
+        cashSettlement.classList.toggle("hidden", !isCash);
+        cashReceivedInput.required = isCash;
+        cashReceivedInput.disabled = !isCash;
+        cashReceivedInput.min = total.toFixed(2);
+        if (isCash && !cashReceivedTouched) {
+          cashReceivedInput.value = total.toFixed(2);
+        }
+        const receivedCents = Math.round(safeNumber(cashReceivedInput.value) * 100);
+        const totalCents = Math.round(total * 100);
+        cashReceivedInput.setCustomValidity(
+          isCash && receivedCents < totalCents
+            ? "El monto recibido debe cubrir el total de la venta."
+            : ""
+        );
+        cashChangeValue.textContent = formatMoney(Math.max(0, receivedCents - totalCents) / 100);
 
         return { subtotal, igv, total };
       }
@@ -396,6 +449,11 @@
       }
 
       document.getElementById("addProductBtn").addEventListener("click", addSelectedProduct);
+      paymentMethodSelect.addEventListener("change", calculateTotals);
+      cashReceivedInput.addEventListener("input", () => {
+        cashReceivedTouched = true;
+        calculateTotals();
+      });
 
       saleItemsBody.querySelectorAll(".qty-input").forEach((input) => {
         input.addEventListener("input", calculateTotals);
@@ -431,11 +489,13 @@
       });
 
       function resetSaleFormView() {
-        receipt.classList.add("hidden");
+        receiptPanel.classList.add("hidden");
         receipt.innerHTML = "";
+        salesLayout.classList.remove("hidden");
         saleForm.reset();
+        cashReceivedTouched = false;
         document.getElementById("customerName").value = "Cliente general";
-        document.getElementById("paymentMethod").value = "Efectivo";
+        paymentMethodSelect.value = "Efectivo";
         document.getElementById("documentNumber").value = "";
         document.getElementById("salesDate").valueAsDate = new Date();
         activeDoc = "boleta";
@@ -452,13 +512,15 @@
       }
 
       document.getElementById("salesDate").valueAsDate = new Date();
+      document.getElementById("printReceiptBtn").addEventListener("click", () => window.print());
+      document.getElementById("newSaleBtn").addEventListener("click", resetSaleFormView);
 
       saleForm.addEventListener("submit", async function (event) {
         event.preventDefault();
 
         const customerName = document.getElementById("customerName").value.trim() || "Cliente general";
         const number = document.getElementById("documentNumber").value.trim();
-        const paymentMethod = document.getElementById("paymentMethod").value;
+        const paymentMethod = paymentMethodSelect.value;
         const items = [...saleItemsBody.querySelectorAll("tr")].map((row) => {
           const qty = safeNumber(row.querySelector(".qty-input")?.value || 0);
           const unitPrice = getRowPrice(row);
@@ -478,6 +540,12 @@
         }
 
         const totals = calculateTotals();
+        const amountReceived = Math.round(safeNumber(cashReceivedInput.value) * 100) / 100;
+        if (paymentMethod.toLowerCase() === "efectivo" && amountReceived < totals.total) {
+          alert("El monto recibido no cubre el total de la venta.");
+          cashReceivedInput.focus();
+          return;
+        }
         const receiptToken = generateReceiptToken();
         const saleData = {
           id: receiptToken,
@@ -485,6 +553,7 @@
           documentNumber: number || (activeDoc === "boleta" ? "DNI 00000000" : "RUC 20123456789"),
           customer: customerName,
           paymentMethod,
+          amountReceived,
           date: document.getElementById("salesDate").value || new Date().toISOString().split("T")[0],
           items,
           total: totals.total
@@ -495,9 +564,9 @@
         try {
           const sale = await apiRequest("/api/ventas", { method: "POST", body: saleData });
           renderReceipt(sale);
+          salesLayout.classList.add("hidden");
           alert(`Comprobante registrado: ${sale.code}`);
           setTimeout(() => window.print(), 100);
-          setTimeout(resetSaleFormView, 300);
         } catch (error) {
           alert(error.message);
         } finally {

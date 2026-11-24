@@ -180,10 +180,20 @@ public class BusinessService {
         saleData.put("type", type);
         saleData.put("customer", cleanText(body.get("customer"), "Cliente general", 200));
         saleData.put("documentNumber", cleanText(body.get("documentNumber"), "", 30));
-        saleData.put("paymentMethod", cleanText(body.get("paymentMethod"), "Efectivo", 50));
+        String paymentMethod = cleanText(body.get("paymentMethod"), "Efectivo", 50);
+        saleData.put("paymentMethod", paymentMethod);
         if (body.get("paymentMethod") != null) {
-            requireCatalogValue("formas_pago", String.valueOf(saleData.get("paymentMethod")), "una forma de pago");
+            requireCatalogValue("formas_pago", paymentMethod, "una forma de pago");
         }
+        BigDecimal amountReceived = "Efectivo".equalsIgnoreCase(paymentMethod)
+                ? nonNegativeDecimal(body.get("amountReceived"), "monto recibido")
+                : total;
+        if (amountReceived.compareTo(total) < 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "El monto recibido no cubre el total de la venta.");
+        }
+        saleData.put("amountReceived", amountReceived);
+        saleData.put("changeDue", amountReceived.subtract(total));
         saleData.put("status", "Emitido");
 
         LocalDateTime saleDate = parseDate(body.get("date"));
@@ -308,6 +318,8 @@ public class BusinessService {
         sale.put("paymentMethod", data.getOrDefault("paymentMethod", "Efectivo"));
         sale.put("date", date.toLocalDate().toString());
         sale.put("total", total);
+        sale.put("amountReceived", data.getOrDefault("amountReceived", total));
+        sale.put("changeDue", data.getOrDefault("changeDue", BigDecimal.ZERO));
         sale.put("items", data.getOrDefault("items", List.of()));
         sale.put("status", data.getOrDefault("status", "Emitido"));
         return sale;

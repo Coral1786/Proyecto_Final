@@ -128,6 +128,7 @@ class BusinessServiceTest {
             "items", java.util.List.of(Map.of("productId", 7, "quantity", 2)),
             "type", "Factura",
             "customer", "Customer",
+            "amountReceived", "25.00",
             "date", "2026-01-02");
 
         Map<String, Object> result = service.createSale(body, 1L);
@@ -136,6 +137,8 @@ class BusinessServiceTest {
         assertEquals("Factura", result.get("type"));
         assertEquals("2026-01-02", result.get("date"));
         assertEquals(new BigDecimal("23.60"), result.get("total"));
+        assertEquals(0, new BigDecimal("25.00").compareTo(new BigDecimal(result.get("amountReceived").toString())));
+        assertEquals(0, new BigDecimal("1.40").compareTo(new BigDecimal(result.get("changeDue").toString())));
         verify(jdbc).update("UPDATE productos SET cantidad = cantidad - ? WHERE id_producto = ?", 2, 7L);
         verify(jdbc).update(
             eq("INSERT INTO ventas (id_comprobante, id_usuario, fecha_venta, productos, suma_total) VALUES (?, ?, ?, ?, ?)"),
@@ -147,5 +150,25 @@ class BusinessServiceTest {
         verify(jdbc).update(
             "INSERT INTO caja (id_comprobante, ingresos, egresos, ganancias_dia, total_caja) VALUES (?, ?, 0, ?, ?)",
             saleId, new BigDecimal("23.60"), new BigDecimal("23.60"), new BigDecimal("43.60"));
+        }
+
+        @Test
+        void rejectsCashSaleWhenReceivedAmountDoesNotCoverTotal() {
+        Map<String, Object> product = Map.of(
+            "id", 7L,
+            "name", "Tool",
+            "price", new BigDecimal("10.00"),
+            "stock", 5);
+        doReturn(java.util.List.of(product)).when(jdbc).query(
+                eq(ACTIVE_PRODUCT_QUERY), ArgumentMatchers.<RowMapper<Map<String, Object>>>any(), eq(7L));
+        Map<String, Object> body = Map.of(
+            "items", java.util.List.of(Map.of("productId", 7, "quantity", 2)),
+            "amountReceived", "20.00");
+
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> service.createSale(body, 1L));
+
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
         }
 }

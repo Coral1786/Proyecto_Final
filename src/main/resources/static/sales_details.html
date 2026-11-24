@@ -154,6 +154,9 @@
 
         const subtotal = sale.items.reduce((sum, item) => sum + safeNumber(item.subtotal), 0);
         const igv = subtotal * 0.18;
+        const cashDetails = String(sale.paymentMethod).toLowerCase() === "efectivo"
+          ? `<div>Recibido: ${formatMoney(sale.amountReceived)}</div><div>Vuelto: ${formatMoney(sale.changeDue)}</div>`
+          : "";
         const itemsHtml = sale.items
           .map(
             (item) => `
@@ -198,6 +201,7 @@
 
           <div class="receipt-footer">
             <div>Pago: ${escapeHtml(sale.paymentMethod)}</div>
+            ${cashDetails}
             <div>Gracias por su compra</div>
           </div>
         `;
